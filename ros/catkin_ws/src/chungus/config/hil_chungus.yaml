@@ -1,0 +1,38 @@
+
+# Model
+traversability_model_variant: "dinov2featup_recons"
+traversability_model_resx: 224 # Inference resolution width (images are dynamically resized to/from this resolution)
+traversability_model_resy: 224 # Inference resolution height (images are dynamically resized to/from this resolution)
+
+# Novelty detection settings
+retrain_on_start: False # Whether to retrain on specified init_embeddings at start
+use_novelty_detection: True # Whether to use novelty detection to trigger HiL labeling
+use_novelty_only_on_control_active: False # If true, then only do novelty detection when /controller_active_param is true
+novelty_stdevs: 2.0 # alpha parameter for novelty threshold
+
+# Training
+train_epochs: 50
+train_decay_gamma: 0.25
+train_decay_step: 50
+train_lr: 0.005
+train_wd: 0.0
+equality_threshold: 0.25 # threshold for equality (for speeding up human labeling process by initializing labels for new annotations)
+lrizz_L: 0.5 # L value for L-RIZZ loss
+
+# These can be used for controller to dictate when to pause for navigation or when controller is active (for use_novelty_only_on_control_active)
+controller_paused_param: "/controller_paused" # Set to true when labeling to allow a controller to know if navigation is to be paused
+controller_active_param: "/controller_active" # Read by CHUNGUS; if use_novelty_only_on_control_active=True, then novelty detection only done when controller_active_param is true.
+
+# Data
+init_embeddings_file: "/home/chungus/ros/data/embeddings_init/blank_embeddings.npy" # The initial embeddings to use (for initial training and for the "database" of prior images)
+init_images_folder: "/home/chungus/ros/data/images_init/blank" # The initial images corresponding to initial embeddings (used for cross image labeling)
+gen_results_folder: "/home/chungus/ros/data/results" # Generated results
+
+# Camera
+camera_topic: "/camera/color/image_raw"
+use_compressed: False
+
+# Output
+traversability_image_topic: "/chungus/traversability/prediction"
+traversability_image_visualize_topic: "/chungus/traversability/visualization"
+traversability_image_uncertainty_topic: "/chungus/traversability/uncertainty"

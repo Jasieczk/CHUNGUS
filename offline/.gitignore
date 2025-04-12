@@ -1,0 +1,10 @@
+*.csv
+*.jpg
+*.jpeg
+*.png
+*.tif
+
+training/experiments/*
+embedding_generation/experiments/*
+embedding_generation/saved_embeddings/*
+embedding_generation/chungus_embeddings/*

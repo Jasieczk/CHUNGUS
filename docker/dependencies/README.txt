@@ -1,0 +1,1 @@
+A folder torch_cache/ should contain the cached torch model weights, and the FeatUp-ROS repo should be cloned (as featup) in the dependencies folder as well.
