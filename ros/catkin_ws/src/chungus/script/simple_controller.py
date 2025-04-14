@@ -9,15 +9,13 @@
 # https://github.com/leggedrobotics/wild_visual_navigation/blob/main/wild_visual_navigation_jackal/scripts/carrot_follower.py
 #
 
-import time
 import math
 import rospy
 import numpy as np
 import tf2_ros
 import tf.transformations as tr
 import threading
-from gazebo_msgs.msg import LinkStates
-from geometry_msgs.msg import Twist, PoseStamped, TransformStamped
+from geometry_msgs.msg import Twist, PoseStamped
 from tf2_geometry_msgs import PointStamped
 
 
@@ -95,7 +93,10 @@ class SimpleController:
                 position = transform[0]
                 orientation = transform[1]
 
-                if np.linalg.norm(position - goal) < self.goal_reached_threshold:
+                # Get position difference
+                position_difference = np.linalg.norm(goal[:2] - position[:2])
+        
+                if position_difference < self.goal_reached_threshold:
                     # Goal reached - clear goal and send motionless command
                     self.send_twist(0.0, 0.0)
                     with self.goal_lock:
@@ -115,9 +116,6 @@ class SimpleController:
                         if angle_difference < 0:
                             angle_difference = angle_difference + 2 * np.pi
                         angle_difference = angle_difference - np.pi
-
-                        # Get position difference
-                        position_difference = np.linalg.norm(goal[:2] - position[:2])
 
                         # Send twist
                         self.send_twist(
