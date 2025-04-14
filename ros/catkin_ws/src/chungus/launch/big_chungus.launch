@@ -6,12 +6,19 @@
     <param name="/use_sim_time" value="true" />
 
     <!-- Args -->
+    <arg name="use_simple_controller" default="true"/>
     <arg name="config_file" default="$(find chungus)/config/big_chungus.yaml"/>
 
     <!-- Launch the node for traversability prediction with CHUNGUS -->
     <rosparam command="load" file="$(arg config_file)" ns="chungus_predictor_node"/>
     <node name="chungus_predictor_node" pkg="chungus" type="chungus_traversability_predictor.py" required="true" output="screen" />
 
+    <!-- If specified, use a simple carrot-follower controller -->
+    <node name="simple_controller" pkg="chungus" type="simple_controller.py" required="true" output="screen" if="$(arg use_simple_controller)"/>
+
+    <!-- Node to publish world->odom from Gazebo -->
+    <node name="gazebo_world_publisher" pkg="chungus" type="gazebo_world_publisher.py" required="true" output="screen"/>
+    
     <!-- Open rviz window -->
     <include file="$(find chungus)/launch/viz.launch"/>
 

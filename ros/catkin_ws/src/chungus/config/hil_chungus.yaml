@@ -7,7 +7,7 @@ traversability_model_resy: 224 # Inference resolution height (images are dynamic
 # Novelty detection settings
 retrain_on_start: False # Whether to retrain on specified init_embeddings at start
 use_novelty_detection: True # Whether to use novelty detection to trigger HiL labeling
-use_novelty_only_on_control_active: False # If true, then only do novelty detection when /controller_active_param is true
+use_novelty_only_on_control_active: True # If true, then only do novelty detection when /controller_active_param is true
 novelty_stdevs: 2.0 # alpha parameter for novelty threshold
 
 # Training

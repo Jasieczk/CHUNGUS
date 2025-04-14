@@ -6,11 +6,11 @@ Repository for the RA-L 2025 paper: "Do You Know the Way? Human-in-the-Loop Unde
 The installation procedure uses Docker and has been tested for Ubuntu 20.04.
 
 ### Prerequisite Data
-- Clone my featup fork into the `docker/dependencies` folder. This can be done as follows (when run within the `docker` folder):
+- Clone my FeatUp fork into the `docker/dependencies` folder. This can be done as follows (when run within the `docker` folder):
     ```
     git clone https://github.com/andreschreiber/FeatUp-ROS.git dependencies/featup/
     ```
-- Copy the "torch_cache" folder from Box (https://uofi.box.com/s/qivs7e5d9fgm46nkdc7oc4z7nhhp5875) to the folder `docker/dependencies/` and unzip it in dependencies (i.e, there should then be a folder docker/dependencies/torch_cache that contains a folder hub/ that in turn has a bunch of folders with checkpoints). This can be done with the following commands (when run within the `docker` folder):
+- Copy the "torch_cache" folder from Box (https://uofi.box.com/s/qivs7e5d9fgm46nkdc7oc4z7nhhp5875) to the folder `docker/dependencies/` and unzip it in dependencies (i.e, there should then be a folder `docker/dependencies/torch_cache` that contains a folder `hub/` that in turn has a bunch of folders with checkpoints). This can be done with the following commands (when run within the `docker` folder):
     ```
     curl -L https://uofi.box.com/shared/static/1ca2s1wa16r6l43ncfl33e48ky4ijlr0 --output dependencies/torch_cache.zip
     unzip dependencies/torch_cache.zip -d ./dependencies/
@@ -66,7 +66,7 @@ If you have downloaded the prerequisite data, you can navigate to the `docker` f
 sudo ./build.sh # Build the image
 sudo ./run.sh # Run the container
 ```
-If you have not built featup yet (in the `docker/dependencies` folder), you can build it easily from within the docker (only needs to be done once, even if the container is destroyed).
+If you have not built FeatUp yet (in the `docker/dependencies` folder), you can build it easily from within the docker (only needs to be done once, even if the container is destroyed).
 ```
 export TORCH_CUDA_ARCH_LIST="3.5;5.0;6.0;6.1;7.0;7.5;8.0;8.6+PTX" && /root/miniconda3/envs/chungus/bin/pip install -e /home/chungus/docker/dependencies/featup
 ```
@@ -97,6 +97,9 @@ OR you can launch Big CHUNGUS using:
 ```
 roslaunch chungus big_chungus.launch
 ```
+An rviz window should pop up after launching `hil_chungus.launch` or `big_chungus.launch`, showing the CHUNGUS information as well as the simulated Jackal.
+
+We have also included a simple carrot-follower controller (it is a "blind pursuit" controller and does not make use of the CHUNGUS predictions and simply is a sample controller that shows how /controller_active and /controller_paused can be used). This simple controller can be used to navigate the robot around by selecting goal points using 2D Nav Goal.
 
 In addition, it should be fairly easy to use this code with your own robot (in simulation or in reality). You will just need to ensure your robot outputs images that can be used for inference, and you need to set the configuration files for CHUNGUS properly (please see below for more details).
 
@@ -109,7 +112,7 @@ To use your own controller with CHUNGUS, you will need to write a controller tha
 
 You can configure your controller to pause control when labeling is being done. The `chungus_traversability_predictor.py` node will set `controller_paused_param` to True when annotations are being provided (and will set it to False after annotations are provided). This can be used by your controller to, for example, pause control during annotation.
 
-CHUNGUS can be configured to only perform novelty detection when control is active by appropriately configuring the relevant rosparam. To do this, set the `controller_active_param` (default value is `/controller_active`) appropriately in the configuration file. Then, set this to true when the controller is active. If `use_novelty_only_on_control_active=True` for CHUNGUS, then it will check the `controller_active_param` ros parameter and only do novelty detection (which can be used to trigger new annotations) when the controller active parameter is set to true (so this parameter could be set to false if you wish to disable detection of novel images for HiL annotation).
+CHUNGUS can be configured to only perform novelty detection when control is active by appropriately configuring the relevant rosparam. To do this, set the `controller_active_param` (default value is `/controller_active`) appropriately in the configuration file. Then, set this to true when the controller is active. If `use_novelty_only_on_control_active=True` for CHUNGUS, then it will check the `controller_active_param` ros parameter and only do novelty detection (which can be used to trigger new annotations) when the controller active parameter is set to true (so this parameter could be set to false if you wish to disable detection of novel images for HiL annotation when a controller is not being used). For an example of how this can be integrated into a controller, look at the `simple_controller.py` file. The `hil_chungus.launch` shows this behavior of only running novelty detection when navigating to a goal; however, this can be changed in the config file if desired.
 
 ## Running the offline training / embedding generation code
 
