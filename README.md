@@ -1,4 +1,8 @@
+
+
 # CHUNGUS (RA-L 2025)
+
+Fork of [elevation_mapping_cupy](https://github.com/andreschreiber/CHUNGUS). Created for research purposes.
 
 Repository for the RA-L 2025 paper: "Do You Know the Way? Human-in-the-Loop Understanding for Fast Traversability Estimation in Mobile Robotics" (Andre Schreiber and Katherine Driggs-Campbell).
 
@@ -12,7 +16,7 @@ Paper: https://ieeexplore.ieee.org/abstract/document/10974681
 The increasing use of robots in unstructured environments necessitates the development of effective perception and navigation strategies to enable field robots to successfully perform their tasks. In particular, it is key for such robots to understand where in their environment they can and cannot travel—a task known as traversability estimation. However, existing geometric approaches to traversability estimation may fail to capture nuanced representations of traversability, whereas vision-based approaches typically either involve manually annotating a large number of images or require robot experience. In addition, existing methods can struggle to address domain shifts as they typically do not learn during deployment. To this end, we propose a human-in-the-loop (HiL) method for traversability estimation that prompts a human for annotations as-needed. Our method uses a foundation model to enable rapid learning on new annotations and to provide accurate predictions even when trained on a small number of quickly-provided HiL annotations. We extensively validate our method in simulation and on real-world data, and demonstrate that it can provide state-of-the-art traversability prediction performance.
 
 ## Installation / Set up
-The installation procedure uses Docker and has been tested for Ubuntu 20.04.
+The installation procedure uses Docker and has been tested for Ubuntu 22.04.
 
 ### Prerequisite Data
 - Clone my FeatUp fork into the `docker/dependencies` folder. This can be done as follows (when run within the `docker` folder):
@@ -84,29 +88,18 @@ In addition, to create additional terminal windows that are attached to the orig
 
 ## Running the ROS code (using Gazebo)
 Create a bash terminal inside the Docker container as described above.
-From within the Docker container, navigate to the catkin_ws and build it:
+From within the Docker container, navigate to the ros2_ws and build it:
 ```
-cd /home/chungus/ros/catkin_ws
-catkin_make
-source devel/setup.bash
-```
-
-Create another terminal window (call it window #2) using `./attach.sh` in the Docker folder (while the other terminal is still open).
-
-In window #2, launch a Gazebo instance (e.g., a Jackal simulation, which should already have a camera if using the docker):
-```
-roslaunch jackal_gazebo hrtac_world.launch
+cd /home/chungus/ros/ros2_ws
+colcon build
+source install/setup.bash
 ```
 
-Return to window #1, now you can launch HiL CHUNGUS using:
+You can launch simluation now together with the big chungus using command:
 ```
-roslaunch chungus hil_chungus.launch
+ros2 launch chungus big_chungus_simulation.launch.py
 ```
-OR you can launch Big CHUNGUS using:
-```
-roslaunch chungus big_chungus.launch
-```
-An rviz window should pop up after launching `hil_chungus.launch` or `big_chungus.launch`, showing the CHUNGUS information as well as the simulated Jackal.
+An RViz window should pop up after launching, displaying Gazebo with the Jackal rover in the example environment and RViz with visualization of the traversability predictions.
 
 We have also included a simple carrot-follower controller (it is a "blind pursuit" controller and does not make use of the CHUNGUS predictions and simply is a sample controller that shows how /controller_active and /controller_paused can be used). This simple controller can be used to navigate the robot around by selecting goal points using 2D Nav Goal.
 
