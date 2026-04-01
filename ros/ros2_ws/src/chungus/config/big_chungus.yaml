@@ -31,8 +31,8 @@ chungus_predictor_node:
     gen_results_folder: "/home/chungus/ros/data/results"
 
     # Camera
-    camera_topic: "/oak/rgb/image_raw/compressed"
-    use_compressed: true
+    camera_topic: "/j100_0001/sensors/camera_0/color/image"
+    use_compressed: false
 
     # Output
     traversability_image_topic: "/chungus/traversability/prediction"
