@@ -1,1 +1,1 @@
-sudo docker build -t chungus_ros .
+sudo docker build --no-cache -t chungus_ros2 .

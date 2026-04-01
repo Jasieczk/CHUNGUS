@@ -1,85 +1,127 @@
-FROM nvidia/cudagl:11.4.2-devel-ubuntu20.04
- 
-# Set noninteractive mode for apt-get
+FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
+
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH="/root/miniconda3/bin:$PATH"
+ENV TORCH_CUDA_ARCH_LIST="8.6"
+ENV FORCE_CUDA=1
 
-# Preconfigure tzdata
-RUN echo "Etc/UTC" > /etc/timezone && \
-    ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
-    apt-get update && apt-get install -y tzdata && \
-    dpkg-reconfigure --frontend noninteractive tzdata
-
-# Install Python
+# -------------------------
+# System + build tools
+# -------------------------
 RUN apt-get update && apt-get install -y \
-    python3.8 \
-    python3-pip \
-    git
+    tzdata wget curl git gnupg2 lsb-release \
+    python3 python3-pip \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install PyTorch
-COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install -r /tmp/requirements.txt
-RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# -------------------------
+# Add ROS 2 repository
+# -------------------------
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+    -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
+    http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" \
+    > /etc/apt/sources.list.d/ros2.list
 
-# Install other Python packages
-RUN pip3 install cupy-cuda11x scikit-learn
+# -------------------------
+# ROS 2 + build tools
+# -------------------------
+RUN apt-get update && apt-get install -y \
+    ros-humble-desktop \
+    python3-colcon-common-extensions \
+    python3-rosdep \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install ROS
-RUN apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
-RUN sh -c 'echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros-latest.list'
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ros-noetic-desktop-full
+RUN rosdep init && rosdep update
 
-# Install relevant ROS packages
-RUN apt install -y ros-noetic-pybind11-catkin \
-    libopencv-dev \
-    libeigen3-dev \
-    libgmp-dev \
-    libmpfr-dev \
-    libboost-all-dev \
-    ros-noetic-turtlebot3-gazebo ros-noetic-turtlebot3-teleop \
-    ros-noetic-ros-numpy
-RUN pip3 install catkin-tools
+# -------------------------
+# Install Miniconda
+# -------------------------
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
+    bash miniconda.sh -b -p /root/miniconda3 && rm miniconda.sh
 
-# Install Jackal and RealSense packages
-RUN apt-get install -y ros-noetic-jackal-simulator ros-noetic-jackal-desktop ros-noetic-jackal-navigation
-RUN apt-get install ros-noetic-realsense2-camera ros-noetic-realsense2-description ros-noetic-gazebo-plugins
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
 
-# Install conda
-RUN apt-get update
-RUN apt-get install -y wget && rm -rf /var/lib/apt/lists/*
-RUN wget \
-    https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
-    && mkdir /root/.conda \
-    && bash Miniconda3-latest-Linux-x86_64.sh -b \
-    && rm -f Miniconda3-latest-Linux-x86_64.sh 
+# -------------------------
+# Create CHUNGUS environment
+# -------------------------
+RUN conda create -n chungus python=3.10 -y
 
-# Create the environment for FeatUp using conda
-RUN /root/miniconda3/bin/conda create -n chungus python=3.8.19 -y \
-    && /root/miniconda3/bin/conda install -n chungus  pytorch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 pytorch-cuda=11.7 -c pytorch -c nvidia -y
+# -------------------------
+# CRITICAL FIXES START HERE
+# -------------------------
 
-# Install in conda environment what is needed to run in ros
-RUN /root/miniconda3/envs/chungus/bin/pip install rospkg \
-    && /root/miniconda3/envs/chungus/bin/pip install opencv-python
+# 1. Install PyTorch with CUDA 11.8 (Matches base image)
+#    We install this FIRST to ensure it grabs the right CUDA libs
+RUN /root/miniconda3/envs/chungus/bin/pip install \
+    torch==2.0.1+cu118 \
+    torchvision==0.15.2+cu118 \
+    torchaudio==2.0.2 \
+    --extra-index-url https://download.pytorch.org/whl/cu118
 
-# Install Faiss
-RUN /root/miniconda3/bin/conda install -n chungus -c conda-forge faiss-cpu -y
+# 2. Install dependencies with version pins to prevent breaking changes
+#    - numpy<2.0: Fixes the binary incompatibility crash
+#    - setuptools<70.0.0: Fixes the 'pkg_resources' error for FeatUp
+#    - colcon-common-extensions: Ensures 'colcon build' uses Conda Python
+#    - faiss-cpu: Installed via pip to avoid MKL conflicts
+RUN /root/miniconda3/envs/chungus/bin/pip install \
+    "numpy<2.0" \
+    "setuptools<70.0.0" \
+    colcon-common-extensions \
+    rospkg opencv-python scikit-learn scikit-image pandas jupyterlab faiss-cpu
 
-# Install dependencies for offline
-RUN /root/miniconda3/bin/conda install -n chungus scikit-image pandas jupyterlab -y
+# Cleanup conda cache
+RUN conda clean -afy
 
-# Add ROS to bashrc
-RUN echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc
-# Add ROS workspace to bashrc
-RUN echo "source /home/chungus/ros/catkin_ws/devel/setup.bash" >> ~/.bashrc
-# Add Jackal URDF extra for camera
-ENV JACKAL_URDF_EXTRAS=/home/chungus/ros/catkin_ws/src/chungus/urdf/jackal_realsense.urdf.xacro
-
-# Add FeatUp (and cached weights)
+# -------------------------
+# FeatUp (CUDA extension builds here)
+# -------------------------
 RUN git clone https://github.com/andreschreiber/FeatUp-ROS.git /home/chungus/docker/dependencies/featup
-RUN export TORCH_CUDA_ARCH_LIST="3.5;5.0;6.0;6.1;7.0;7.5;8.0;8.6+PTX" && /root/miniconda3/envs/chungus/bin/pip install -e /home/chungus/docker/dependencies/featup
+
+# Build FeatUp
+# We use --no-build-isolation so it sees our pinned NumPy and PyTorch
+RUN /bin/bash -c "source /root/miniconda3/etc/profile.d/conda.sh && \
+    conda activate chungus && \
+    TORCH_CUDA_ARCH_LIST='8.6' FORCE_CUDA=1 \
+    pip install --no-build-isolation -e /home/chungus/docker/dependencies/featup"
+
+# Optional: preload torch hub cache
 COPY ./dependencies/torch_cache/hub /root/.cache/torch/hub
 
-# Configure to always open in correct folder
-RUN echo "cd /home/chungus" >> ~/.bashrc
+
+
+# Shell setup
+RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc && \
+    echo "source /root/miniconda3/etc/profile.d/conda.sh" >> ~/.bashrc && \
+    echo "conda activate chungus" >> ~/.bashrc
+
+RUN export ROS_DOMAIN_ID=100 && \
+    echo "export ROS_DOMAIN_ID=100" >> ~/.bashrc
+
+# 1. Instalacja podstawowych narzędzi i kluczy Clearpath
+RUN apt-get update && apt-get install -y wget nano git iputils-ping && \
+    wget -O - https://packages.clearpathrobotics.com/public.key | tee /etc/apt/keyrings/clearpath.asc > /dev/null && \
+    sh -c 'echo "deb [signed-by=/etc/apt/keyrings/clearpath.asc] https://packages.clearpathrobotics.com/stable/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/clearpath-latest.list'
+
+# 2. Instalacja symulatora i narzędzi Clearpath
+RUN apt-get update && apt-get install -y \
+    ros-humble-clearpath-simulator \
+    ros-humble-clearpath-generator-common \
+    ros-humble-clearpath-config-live \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install pyyaml    
+# Możesz też użyć COPY, jeśli masz własny plik: COPY robot.yaml /root/clearpath/robot.yaml
+RUN mkdir -p /root/clearpath
+COPY robot.yaml /root/clearpath/robot.yaml
+
+# 4. Generowanie plików startowych i URDF (BARDZO WAŻNE: używamy bash, aby móc użyć 'source')
+RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
+    ros2 run clearpath_generator_common generate_bash -s /root/clearpath && \
+    ros2 run clearpath_generator_common generate_description -s /root/clearpath"
+
+
+#ENV JACKAL_URDF_EXTRAS=/home/chungus/ros/catkin_ws/src/chungus/urdf/jackal_realsense.urdf.xacro
 
 ENTRYPOINT ["/home/chungus/docker/docker_startup.sh"]

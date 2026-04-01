@@ -32,6 +32,6 @@ docker run -it \
     -eHOST_USERNAME=$(whoami) \
     -v $pwd./../:/home/chungus/ \
     --gpus all \
-    --name chungus \
-    chungus_ros:latest \
+    --name chungus_ros2 \
+    chungus_ros2:latest \
     bash

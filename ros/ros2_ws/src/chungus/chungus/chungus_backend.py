@@ -2,7 +2,7 @@ import cv2
 import time
 import json
 import math
-import rospy
+import rclpy
 import torch
 import faiss
 import random
@@ -11,7 +11,7 @@ import threading
 import numpy as np
 from pathlib import Path
 from .losses import LRIZZ
-
+from rclpy.parameter import Parameter
 
 # Keycodes for labeling interface
 KEY_CONFIRM = 32
@@ -100,7 +100,7 @@ class ChungusBackend:
         """ Save the initial model """
 
         self.traversability_prediction_node.model.save_model(self.initial_model_save_file)
-        rospy.loginfo("Saving model to file: {}".format(str(self.initial_model_save_file)))
+        self.traversability_prediction_node.get_logger().info("Saving model to file: {}".format(str(self.initial_model_save_file)))
 
     def create_results_directory(self):
         """ Create a results folder and save settings """
@@ -136,14 +136,14 @@ class ChungusBackend:
 
         with self.embeddings_lock:
             self.embeddings = np.load(file, allow_pickle=True).item()
-            rospy.loginfo("Read embeddings file. {} embeddings found (with {} cls tokens)".format(
+            self.traversability_prediction_node.get_logger().info("Read embeddings file. {} embeddings found (with {} cls tokens)".format(
                 self.embeddings['embeddings'].shape[0], self.embeddings['cls_tokens'].shape[0]
             ))
 
     def write_embeddings(self):
         """ Write embeddings to a file """
 
-        rospy.loginfo("Writing embeddings to {}".format(str(self.gen_embeddings_file)))
+        self.traversability_prediction_node.get_logger().info("Writing embeddings to {}".format(str(self.gen_embeddings_file)))
         with self.embeddings_lock:
             np.save(self.gen_embeddings_file, self.embeddings)
 
@@ -156,7 +156,7 @@ class ChungusBackend:
                 if self.embeddings['cls_tokens'].shape[0] > 0:
                     self.index.add(self.embeddings['cls_tokens'])
                     assert(self.index.is_trained)
-                    rospy.loginfo("Updated index (now contains {} items)".format(self.index.ntotal))
+                    self.traversability_prediction_node.get_logger().info("Updated index (now contains {} items)".format(self.index.ntotal))
 
                     errors = None
                     if self.embeddings['cls_tokens'].shape[0] > 1:
@@ -168,7 +168,7 @@ class ChungusBackend:
                         'stdev_error': float(errors.std()) if errors is not None else 0.0
                     }
                 else:
-                    rospy.loginfo("No CLS tokens in embeddings file. Creating empty index...")
+                    self.traversability_prediction_node.get_logger().info("No CLS tokens in embeddings file. Creating empty index...")
                     # Populate metadata
                     self.index_metadata = {
                         'mean_error': 0.0,
@@ -227,7 +227,7 @@ class ChungusBackend:
         with self.embeddings_lock:
             # embedding -> (N,2,384) -> (N,2,384,1) -> (N,384,2,1)
             if self.embeddings['embeddings'].shape[0] == 0:
-                rospy.logwarn("Train requested but not completed due to no data.")
+                self.traversability_prediction_node.get_logger().warn("Train requested but not completed due to no data.")
                 return
             else:
                 emb = torch.tensor(self.embeddings['embeddings'], dtype=torch.float, device=self.device).unsqueeze(-1).permute(0,2,1,3)
@@ -273,12 +273,12 @@ class ChungusBackend:
         elapsed = time.time() - elapsed
 
         # Log info
-        rospy.loginfo("Finished training in {:.3f} seconds (best loss = {:.3f} @ epoch = {})".format(
+        self.traversability_prediction_node.get_logger().info("Finished training in {:.3f} seconds (best loss = {:.3f} @ epoch = {})".format(
             elapsed,
             min(losses),
             1+np.argmin(losses)
         ))
-        rospy.loginfo("Training was performed on embeddings: {} and labels: {}".format(
+        self.traversability_prediction_node.get_logger().info("Training was performed on embeddings: {} and labels: {}".format(
             emb.shape, lab.shape
         ))
 
@@ -288,7 +288,11 @@ class ChungusBackend:
         """ Pause the controller by setting the paused parameter """
 
         if self.controller_paused_param is not None:
-            rospy.set_param(self.controller_paused_param, paused)
+            # Set the parameter on this node
+            from rclpy.parameter import Parameter
+            self.traversability_prediction_node.set_parameters([
+                Parameter('controller_paused', Parameter.Type.BOOL, paused)
+            ])
 
     def draw_cross(self, img, x, y, w, h, fraction=0.04, thickness=4, color=(0,0,255)):
         """ Draw a crosshair on an image """
@@ -343,7 +347,7 @@ class ChungusBackend:
         W, H = intra_image.shape[:2][::-1]
 
         # generate locations
-        rospy.loginfo("Labeling for intra-image label")
+        self.traversability_prediction_node.get_logger().info("Labeling for intra-image label")
         x1, x2 = random.randrange(0, W), random.randrange(0, W)
         y1, y2 = random.randrange(0, H), random.randrange(0, H)
         while math.sqrt((x1 - x2)**2 + (y1 - y2)**2) < min(0.05*W, 0.05*H): # don't allow locations to be super close to each other
@@ -407,7 +411,7 @@ class ChungusBackend:
         W, H = intra_image.shape[:2][::-1]
 
         # generate locations
-        rospy.loginfo("Labeling for cross-image label")
+        self.traversability_prediction_node.get_logger().info("Labeling for cross-image label")
         # x1,y1 should be the min (most familiar in previous image)
         # x2,y2 should be the max (least familiar in current image)
         # The 'reconstruction' inference results are (H,W)
@@ -542,18 +546,18 @@ class ChungusBackend:
                 cross_image_file = None
         
         if cross_image_file is not None:
-            rospy.loginfo("Using cross image file {}".format(str(cross_image_file)))
+            self.traversability_prediction_node.get_logger().info("Using cross image file {}".format(str(cross_image_file)))
             cross_image = cv2.cvtColor(cv2.resize(cv2.imread(cross_image_file), image_resolution, interpolation=cv2.INTER_LINEAR), cv2.COLOR_BGR2RGB)
-            inference_results_cross = self.traversability_prediction_node.perform_inference(cross_image)
+            inference_results_cross = self.traversability_prediction_node.perform_inference(cross_image, resize_features=True, compute_reconstruction=True)
         else:
-            rospy.loginfo("Not using a cross image label as there are no prior images")
+            self.traversability_prediction_node.get_logger().info("Not using a cross image label as there are no prior images")
             cross_image = None
             inference_results_cross = None
         
         # Write the new image to label to a file
         label_time_str = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S_%f')
         intra_image_file = self.gen_images_folder / Path("img{}.jpg".format(label_time_str))
-        rospy.loginfo("Saving image to file {}".format(str(intra_image_file)))
+        self.traversability_prediction_node.get_logger().info("Saving image to file {}".format(str(intra_image_file)))
         cv2.imwrite(str(intra_image_file), cv2.cvtColor(intra_image, cv2.COLOR_RGB2BGR))
 
         # Now perform labeling
@@ -577,7 +581,7 @@ class ChungusBackend:
         # Retrain model
         model_train_time = self.retrain_model()
         self.traversability_prediction_node.model.save_model(self.model_save_file)
-        rospy.loginfo("Saving model to file: {}".format(str(self.model_save_file)))
+        self.traversability_prediction_node.get_logger().info("Saving model to file: {}".format(str(self.model_save_file)))
         with self.embeddings_lock:
             self.embeddings['training_times'].append(model_train_time)
 

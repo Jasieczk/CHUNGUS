@@ -1,0 +1,43 @@
+serial_number: j100-0001
+version: 0
+system:
+  username: administrator
+  hosts:
+    - hostname: cpr-j100-0001
+      ip: 192.168.131.1
+  ros2:
+    namespace: j100_0001
+    domain_id: 0
+    middleware:
+      implementation: rmw_fastrtps_cpp
+platform:
+  attachments:
+    - name: front_fender
+      type: j100.fender
+    - name: rear_fender
+      type: j100.fender
+      rpy: [0.0, 0.0, 3.1415]
+  mcu:
+    protocol: proton
+# FIX: Attach sensors to base_link to avoid "parent link not found" errors
+sensors:
+  camera:
+    - model: intel_realsense
+      urdf_enabled: true
+      launch_enabled: true
+      parent: base_link
+      xyz: [0.2, 0.0, 0.2]
+      rpy: [0.0, 0.0, 0.0]
+      ros_parameters:
+        intel_realsense:
+          camera_name: camera_0
+  lidar2d:
+    - model: hokuyo_ust
+      urdf_enabled: true
+      launch_enabled: true
+      parent: base_link
+      xyz: [0.1, 0.0, 0.2]
+      rpy: [0.0, 0.0, 0.0]
+      ros_parameters:
+        hokuyo_ust:
+          frame_id: laser

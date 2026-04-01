@@ -1,1 +1,1 @@
-docker exec -it chungus bash
+docker exec -it chungus_ros2 bash

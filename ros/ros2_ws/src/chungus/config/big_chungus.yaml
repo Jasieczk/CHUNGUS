@@ -1,0 +1,40 @@
+chungus_predictor_node:
+  ros__parameters:
+
+    # Model
+    traversability_model_variant: "dinov2featup_recons"
+    traversability_model_resx: 224
+    traversability_model_resy: 224
+
+    # Novelty detection settings
+    retrain_on_start: true
+    use_novelty_detection: false
+    use_novelty_only_on_control_active: false
+    novelty_stdevs: 2.0
+
+    # Training
+    train_epochs: 50
+    train_decay_gamma: 0.25
+    train_decay_step: 50
+    train_lr: 0.005
+    train_wd: 0.0
+    equality_threshold: 0.25
+    lrizz_L: 0.5
+
+    # Controller state params (names only, NOT params themselves)
+    controller_paused_param: "/controller_paused"
+    controller_active_param: "/controller_active"
+
+    # Data
+    init_embeddings_file: "/home/chungus/ros/data/embeddings_init/dinov2_224x224_outdoor_all.npy"
+    init_images_folder: "/home/chungus/ros/data/images_init/outdoor"
+    gen_results_folder: "/home/chungus/ros/data/results"
+
+    # Camera
+    camera_topic: "/oak/rgb/image_raw/compressed"
+    use_compressed: true
+
+    # Output
+    traversability_image_topic: "/chungus/traversability/prediction"
+    traversability_image_visualize_topic: "/chungus/traversability/visualization"
+    traversability_image_uncertainty_topic: "/chungus/traversability/uncertainty"
